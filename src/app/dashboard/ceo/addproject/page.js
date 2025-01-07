@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const AddProjectPage = () => {
@@ -13,8 +13,24 @@ const AddProjectPage = () => {
     detail: "",
     value: "",
     status: "",
-    userId: "", // Ganti dengan ID user aktif (misalnya dari session)
   });
+  const [userId, setUserId] = useState(""); // ID user yang login
+
+  useEffect(() => {
+    // Ambil ID user dari sesi atau API
+    const fetchUserId = async () => {
+      try {
+        const res = await fetch("/api/v1/auth/session"); // Contoh endpoint sesi
+        if (!res.ok) throw new Error("Failed to fetch session");
+        const data = await res.json();
+        setUserId(data.userId); // Asumsi `userId` tersedia dalam sesi
+      } catch (error) {
+        console.error("Error fetching session:", error);
+      }
+    };
+
+    fetchUserId();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -28,7 +44,7 @@ const AddProjectPage = () => {
       const res = await fetch("/api/v1/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, userId }), // Tambahkan userId
       });
 
       if (!res.ok) {
@@ -97,18 +113,10 @@ const AddProjectPage = () => {
           <option value="Kontrak">Kontrak</option>
           <option value="completed">Completed</option>
         </select>
-        <input
-          type="text"
-          name="userId"
-          placeholder="User ID"
-          value={formData.userId}
-          onChange={handleChange}
-          className="w-full p-2 border rounded-md"
-          required
-        />
         <button
           type="submit"
           className="w-full p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          disabled={!userId} // Tombol dinonaktifkan jika userId belum tersedia
         >
           Tambah Proyek
         </button>
