@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import ProjectCard from "./ProjectCard";
+import Link from "next/link";
 
 const ProjectList = () => {
   const [projects, setProjects] = useState([]);
@@ -38,13 +39,18 @@ const ProjectList = () => {
   return (
     <div className="flex flex-wrap justify-center gap-4 p-4">
       {projects.map((project) => (
-        <ProjectCard
+        <Link
           key={project.id}
-          name={project.name}
-          owner={project.owner}
-          value={project.value}
-          status={project.status}
-        />
+          href={`/project/${project.id}`}
+          className="w-full max-w-md p-4 mb-4 rounded-lg shadow-md border bg-white text-gray-800 hover:bg-gray-100 cursor-pointer"
+        >
+          <ProjectCard
+            name={project.name}
+            owner={project.owner}
+            value={project.value}
+            status={project.status}
+          />
+        </Link>
       ))}
     </div>
   );
