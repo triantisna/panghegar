@@ -25,7 +25,7 @@ export default function Register() {
 
     if (res.ok) {
       alert(data.message);
-      router.push("/login");
+      router.push("/");
     } else {
       alert(data.message);
     }
