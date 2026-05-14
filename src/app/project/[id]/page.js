@@ -29,7 +29,7 @@ async function getProjectData(projectId) {
     include: {
       estimates: true,
       materialRequests: {
-        include: { user: true }
+        include: { requestedBy: true }
       },
       operationalCosts: {
         include: { user: true }
