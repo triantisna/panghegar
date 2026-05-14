@@ -45,14 +45,43 @@ async function getProjectData(projectId) {
 
   if (!project) return null;
 
-  // Konversi BigInt ke String agar aman dikirim ke Client Component
-  const serializeBigInt = (obj) => {
-    return JSON.parse(JSON.stringify(obj, (key, value) =>
-      typeof value === "bigint" ? value.toString() : value
-    ));
+  // 1. Hitung RAB (dari estimates yang APPROVED)
+  const approvedEstimate = project.estimates?.find(e => e.status === "APPROVED") || 
+                           project.estimates?.[0]; // Fallback ke yang pertama jika tidak ada yang approved
+
+  const rabMaterial = Number(approvedEstimate?.materialCost || 0);
+  const rabOperational = Number(approvedEstimate?.operationalCost || 0);
+
+  // 2. Hitung Realisasi (dari biaya yang sudah APPROVED)
+  const realMaterial = project.materialRequests
+    ?.filter(m => m.status === "APPROVED")
+    .reduce((sum, m) => sum + Number(m.totalPrice || 0), 0) || 0;
+
+  const realOperational = project.operationalCosts
+    ?.filter(c => c.status === "APPROVED")
+    .reduce((sum, c) => sum + Number(c.amount || 0), 0) || 0;
+
+  // 3. Gabungkan ke dalam objek summary
+  const summary = {
+    rabMaterial,
+    rabOperational,
+    rabTotal: rabMaterial + rabOperational,
+    realMaterial,
+    realOperational,
+    realTotal: realMaterial + realOperational,
+    diffTotal: (realMaterial + realOperational) - (rabMaterial + rabOperational),
   };
 
-  return serializeBigInt(project);
+  // Bungkus project dan summary
+  const result = {
+    ...project,
+    summary // Masukkan summary ke dalam objek data
+  };
+
+  // Konversi BigInt
+  return JSON.parse(JSON.stringify(result, (key, value) =>
+    typeof value === "bigint" ? value.toString() : value
+  ));
 }
 
 export default async function DetailProjectPage({ params }) {
@@ -76,14 +105,26 @@ export default async function DetailProjectPage({ params }) {
   
   // Kalkulasi summary (bisa dilakukan langsung di sini)
   const rabMaterial = projectData.estimates?.reduce((sum, e) => sum + Number(e.materialCost || 0), 0) || 0;
-  const rabOperational = projectData.estimates?.reduce((sum, e) => sum + Number(e.operationalCost || 0), 0) || 0;
-  
-  const summary = {
-    rabMaterial,
-    rabOperational,
-    rabTotal: rabMaterial + rabOperational,
-    // Sisanya akan dikalkulasi oleh Client Component atau bisa ditambahkan di sini
-  };
+const rabOperational = projectData.estimates?.reduce((sum, e) => sum + Number(e.operationalCost || 0), 0) || 0;
+
+// Hitung realisasi dari biaya operasional dan material yang sudah disetujui
+const realOperational = projectData.operationalCosts
+  ?.filter(c => c.status === 'APPROVED')
+  .reduce((sum, c) => sum + Number(c.amount || 0), 0) || 0;
+
+const realMaterial = projectData.materialRequests
+  ?.filter(m => m.status === 'APPROVED')
+  .reduce((sum, m) => sum + Number(m.totalPrice || 0), 0) || 0;
+
+const summary = {
+  rabMaterial,
+  rabOperational,
+  rabTotal: rabMaterial + rabOperational,
+  realMaterial,
+  realOperational,
+  realTotal: realMaterial + realOperational,
+  diffTotal: (rabMaterial + rabOperational) - (realMaterial + realOperational),
+};
 
   return (
     <DetailProjectClient

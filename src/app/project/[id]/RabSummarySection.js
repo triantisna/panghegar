@@ -112,24 +112,43 @@ export default function RabSummarySection({
 
       {/* Grid Ringkasan RAB (Sama seperti sebelumnya) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm mb-6">
+      {/* KOLOM RAB */}
         <div className="border rounded p-3">
           <p className="font-semibold text-gray-700 mb-1">RAB</p>
-          <p className="text-gray-600">Material: Rp. {summary.rabMaterial.toLocaleString("id-ID")}</p>
-          <p className="text-gray-600">Operasional: Rp. {summary.rabOperational.toLocaleString("id-ID")}</p>
-          <p className="mt-1 font-semibold text-gray-800">Total: Rp. {summary.rabTotal.toLocaleString("id-ID")}</p>
+          <p className="text-gray-600">
+            Material: Rp. {(summary?.rabMaterial || 0).toLocaleString("id-ID")}
+          </p>
+          <p className="text-gray-600">
+            Operasional: Rp. {(summary?.rabOperational || 0).toLocaleString("id-ID")}
+          </p>
+          <p className="mt-1 font-semibold text-gray-800">
+            Total: Rp. {(summary?.rabTotal || 0).toLocaleString("id-ID")}
+          </p>
         </div>
+
+        {/* KOLOM REALISASI */}
         <div className="border rounded p-3">
           <p className="font-semibold text-gray-700 mb-1">Realisasi</p>
-          <p className="text-gray-600">Material: Rp. {summary.realMaterial.toLocaleString("id-ID")}</p>
-          <p className="text-gray-600">Operasional: Rp. {summary.realOperational.toLocaleString("id-ID")}</p>
-          <p className="mt-1 font-semibold text-gray-800">Total: Rp. {summary.realTotal.toLocaleString("id-ID")}</p>
+          <p className="text-gray-600">
+            Material: Rp. {(summary?.realMaterial || 0).toLocaleString("id-ID")}
+          </p>
+          <p className="text-gray-600">
+            Operasional: Rp. {(summary?.realOperational || 0).toLocaleString("id-ID")}
+          </p>
+          <p className="mt-1 font-semibold text-gray-800">
+            Total: Rp. {(summary?.realTotal || 0).toLocaleString("id-ID")}
+          </p>
         </div>
+
+        {/* KOLOM SELISIH */}
         <div className="border rounded p-3">
           <p className="font-semibold text-gray-700 mb-1">Selisih</p>
-          <p className={summary.diffTotal > 0 ? "text-rose-600 font-semibold" : summary.diffTotal < 0 ? "text-emerald-600 font-semibold" : "text-gray-700 font-semibold"}>
-            {summary.diffTotal > 0 ? "Over budget" : summary.diffTotal < 0 ? "Under budget" : "Sesuai RAB"}
+          <p className={(summary?.diffTotal || 0) > 0 ? "text-rose-600 font-semibold" : (summary?.diffTotal || 0) < 0 ? "text-emerald-600 font-semibold" : "text-gray-700 font-semibold"}>
+            {(summary?.diffTotal || 0) > 0 ? "Over budget" : (summary?.diffTotal || 0) < 0 ? "Under budget" : "Sesuai RAB"}
           </p>
-          <p className="text-gray-800">Rp. {summary.diffTotal.toLocaleString("id-ID")}</p>
+          <p className="text-gray-800">
+            Rp. {(summary?.diffTotal || 0).toLocaleString("id-ID")}
+          </p>
         </div>
       </div>
 

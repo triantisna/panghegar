@@ -23,9 +23,11 @@ const TABS = [
 ];
 
 const formatNumber = (value) => {
-  if (value == null) return "-";
+  // Jika value undefined, null, atau NaN, kembalikan "0" atau "-"
+  if (value == null || isNaN(value)) return "0"; 
+  
   return new Intl.NumberFormat("id-ID").format(
-    typeof value === "bigint" ? Number(value) : value
+    typeof value === "bigint" ? Number(value) : Number(value)
   );
 };
 
