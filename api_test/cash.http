@@ -1,0 +1,15 @@
+GET http://localhost:3000/api/v1/cashs
+
+### add cash
+POST http://localhost:3000/api/v1/cashs
+Content-Type: application/json
+
+{
+    "date": "08/01/2025",
+    "desc": "Entertain",
+    "place": "Clubing",
+    "price": "10000000",
+    "image": "asbfaidfhao",
+    "userId": "cm49z8yi800008sb2t20cr4t4",
+    "projectId": "cm49zciol00018sb24z28bsfw"
+}

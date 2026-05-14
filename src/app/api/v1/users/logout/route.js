@@ -4,7 +4,7 @@ export async function POST() {
   const sessionCookie = serialize("user_session", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 0, // Hapus cookie dengan membuatnya kedaluwarsa
+    maxAge: 0,
     path: "/",
   });
 

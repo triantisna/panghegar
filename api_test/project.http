@@ -1,0 +1,17 @@
+GET http://localhost:3000/api/v1/projects
+
+### Create new product
+POST http://localhost:3000/api/v1/projects
+Content-Type: application/json
+
+{
+    "name": "Apartement",
+    "owner": "Trian",
+    "detail": "asfgae",
+    "value": 900000001,
+    "status": "negosiasi",
+    "userId": "cm49z8yi800008sb2t20cr4t4"
+}
+
+### check projectId
+GET http://localhost:3000/api/v1/projects/[projectId]

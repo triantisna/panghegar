@@ -11,6 +11,7 @@ export async function GET(req) {
 
   const user = await prisma.user.findUnique({
     where: { id: sessionCookie.value },
+    include: { role: true },
   });
 
   if (!user) {
@@ -19,7 +20,14 @@ export async function GET(req) {
     });
   }
 
-  return new Response(JSON.stringify({ name: user.name, userId: user.id }), {
-    status: 200,
-  });
+  return new Response(
+    JSON.stringify({
+      id: user.id,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role?.name,
+    }),
+    { status: 200 }
+  );
 }

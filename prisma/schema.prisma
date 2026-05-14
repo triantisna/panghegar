@@ -5,56 +5,399 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+//// ================================
+//// ENUM
+//// ================================
+
+enum RoleName {
+  CEO
+  ADMIN
+  PM
+  TECH
+  ENGINEER
+}
+
+enum ProjectStatus {
+  NEGOSIASI
+  KONTRAK
+  ONGOING
+  DONE
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RequestType {
+  MATERIAL
+  COST
+}
+
+enum ApprovalAction {
+  APPROVE
+  REJECT
+}
+
+enum NotificationType {
+  MATERIAL_REQUEST
+  COST_REQUEST
+  TASK_ASSIGNED
+  PROGRESS_UPDATE
+}
+
+enum DocumentType {
+  SERAH_TERIMA
+  PHOTO
+  INVOICE
+  RAB_PDF
+  SURAT_KONTRAK
+  OTHER
+}
+
+//// ================================
+//// ROLE & USER
+//// ================================
+
+model Role {
+  id    String   @id @default(cuid())
+  name  RoleName @unique
+  users User[]
 }
 
 model User {
-  id       String @id @default(cuid())
-  name     String
-  email    String @unique
-  password String
-  role     String
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  avatarUrl String?
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  project  Project[]
-  cash     Cash[]
-  property Property[]
+  // RELASI BALIK
+  projectsCreated   Project[]         @relation("CreatedProjects")
+  projectsAsPm      Project[]         @relation("ProjectPm")
+  assignments       Assignment[]
+  progressReports   ProgressReport[]
+  operationalCosts  OperationalCost[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  approvalsGiven    Approval[]        @relation("ApproverApprovals")
+  materialUsages    MaterialUsage[]
+  materialRequests  MaterialRequest[]
+  documentsUploaded Document[]
+  projectEstimates  ProjectEstimate[] @relation("UserProjectEstimates")
+  tasksCreated      Task[]            @relation("UserTasksCreated")
+  estimatesApproved ProjectEstimate[] @relation("UserApprovesEstimates")
+}
+
+//// ================================
+//// CLIENT & PROJECT
+//// ================================
+
+model Client {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  notes        String?
+  projects     Project[]
 }
 
 model Project {
-  id     String @id @default(cuid())
-  name   String
-  owner  String
-  detail String
-  value  Int
-  status String
-  userId String
+  id   String  @id @default(cuid())
+  name String
+  code String?
 
-  cash     Cash[]
-  property Property[]
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
 
-  user User @relation(fields: [userId], references: [id])
+  createdById String
+  createdBy   User   @relation("CreatedProjects", fields: [createdById], references: [id])
+
+  pmId String?
+  pm   User?   @relation("ProjectPm", fields: [pmId], references: [id])
+
+  value  BigInt?
+  status ProjectStatus
+
+  startDate   DateTime?
+  endDate     DateTime?
+  actualStart DateTime?
+  actualEnd   DateTime?
+  description String?
+
+  tasks            Task[]
+  materialUsage    MaterialUsage[]
+  operationalCosts OperationalCost[]
+  documents        Document[]
+  estimates        ProjectEstimate[]
+  activityLogs     ActivityLog[]
+  materialRequests MaterialRequest[]
+  progressReports  ProgressReport[]
+  assignments      Assignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model Cash {
-  id        String @id @default(cuid())
-  date      String
-  desc      String
-  place     String
-  price     String
-  image     String
-  userId    String
-  projectId String
+//// ================================
+//// PROJECT ESTIMATE (RAB)
+//// ================================
 
-  user    User    @relation(fields: [userId], references: [id])
-  project Project @relation(fields: [projectId], references: [id])
+model ProjectEstimate {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  estimatedMaterialCost    BigInt
+  estimatedOperationalCost BigInt
+  totalEstimate            BigInt
+
+  createdById String
+  createdBy   User   @relation("UserProjectEstimates", fields: [createdById], references: [id])
+
+  status       RequestStatus @default(PENDING) // PENDING / APPROVED / REJECTED
+  approvedById String?
+  approvedBy   User?         @relation("UserApprovesEstimates", fields: [approvedById], references: [id])
+
+  createdAt DateTime @default(now())
 }
 
-model Property {
-  id        String @id @default(cuid())
-  name      String
-  unit      String
-  userId    String
-  projectId String
+//// ================================
+//// TASK & ASSIGNMENT
+//// ================================
 
-  user    User    @relation(fields: [userId], references: [id])
+// model Task belum digunakan kaarena masih fokus ke manajemen material dan biaya, 
+// tapi sudah disiapkan untuk pengembangan fitur manajemen tugas di masa depan.
+model Task {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  title          String
+  description    String?
+  status         TaskStatus
+  priority       Priority?
+  estimatedHours Int?
+  startDate      DateTime?
+  dueDate        DateTime?
+
+  createdById String
+  createdBy   User   @relation("UserTasksCreated", fields: [createdById], references: [id])
+
+  assignments     Assignment[]
+  progressReports ProgressReport[]
+  materialUsage   MaterialUsage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Assignment {
+  id        String  @id @default(cuid())
+  userId    String
+  projectId String?
+  taskId    String?
+
+  user    User     @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+  task    Task?    @relation(fields: [taskId], references: [id])
+
+  role       String?
+  assignedAt DateTime @default(now())
+}
+
+//// ================================
+//// MATERIAL & USAGE
+//// ================================
+
+model Material {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  sku          String?
+  unit         String
+  defaultPrice Int?
+  stock        Int?
+
+  usage    MaterialUsage[]
+  requests MaterialRequest[]
+}
+
+model MaterialUsage {
+  id         String  @id @default(cuid())
+  projectId  String
+  taskId     String?
+  materialId String
+
+  quantity  Float
+  unitPrice Int?
+
+  usedById String
+  usedBy   User   @relation(fields: [usedById], references: [id])
+
+  project  Project  @relation(fields: [projectId], references: [id])
+  task     Task?    @relation(fields: [taskId], references: [id])
+  material Material @relation(fields: [materialId], references: [id])
+
+  usedAt DateTime @default(now())
+}
+
+//// ================================
+//// MATERIAL REQUEST & APPROVAL
+//// ================================
+
+model MaterialRequest {
+  id            String @id @default(cuid())
+  projectId     String
+  materialId    String
+  requestedById String
+
+  quantity Float
+  reason   String?
+  status   RequestStatus
+
+  project     Project  @relation(fields: [projectId], references: [id])
+  material    Material @relation(fields: [materialId], references: [id])
+  requestedBy User     @relation(fields: [requestedById], references: [id])
+
+  approvals Approval[]
+
+  createdAt DateTime @default(now())
+}
+
+model Approval {
+  id          String         @id @default(cuid())
+  requestType RequestType
+  requestId   String
+  approverId  String
+  action      ApprovalAction
+  note        String?
+
+  approver User @relation("ApproverApprovals", fields: [approverId], references: [id])
+
+  // relasi khusus ke MaterialRequest
+  materialRequestId String?
+  materialRequest   MaterialRequest? @relation(fields: [materialRequestId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//// ================================
+//// OPERATIONAL COST
+//// ================================
+
+model OperationalCost {
+  id          String        @id @default(cuid())
+  projectId   String
+  userId      String
+  description String
+  amount      BigInt
+  date        DateTime
+  receiptUrl  String?
+  status      RequestStatus
+
   project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}
+
+//// ================================
+//// PROGRESS REPORT
+//// ================================
+
+model ProgressReport {
+  id              String  @id @default(cuid())
+  projectId       String
+  taskId          String?
+  userId          String
+  percentComplete Int
+  notes           String?
+  photos          Json?
+
+  project Project @relation(fields: [projectId], references: [id])
+  task    Task?   @relation(fields: [taskId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//// ================================
+//// NOTIFICATION
+//// ================================
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType
+  data        Json?
+  isRead      Boolean          @default(false)
+  emailSent   Boolean          @default(false)
+  emailSentAt DateTime?
+
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+//// ================================
+//// DOCUMENT
+//// ================================
+
+model Document {
+  id           String @id @default(cuid())
+  projectId    String
+  uploadedById String
+
+  fileUrl String
+  type    DocumentType
+
+  project    Project @relation(fields: [projectId], references: [id])
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+//// ================================
+//// ACTIVITY LOG
+//// ================================
+
+model ActivityLog {
+  id         String @id @default(cuid())
+  actorId    String
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  createdAt DateTime @default(now())
 }
