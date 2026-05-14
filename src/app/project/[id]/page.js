@@ -2,6 +2,8 @@ import { prisma } from "@/app/lib/prisma";
 import { cookies } from "next/headers";
 import DetailProjectClient from "./DetailProjectClient";
 
+// trigger rebuild v2
+
 // 1. Session check dibuat se-minimal mungkin
 async function getSession() {
   const cookieStore = await cookies();
