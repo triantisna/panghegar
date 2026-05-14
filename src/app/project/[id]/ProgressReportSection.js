@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 export default function ProgressReportSection({ projectId, role }) {
@@ -164,7 +165,7 @@ export default function ProgressReportSection({ projectId, role }) {
               {r.photos && (
                 <div className="relative group w-20 h-20 mb-2">
                   <a href={r.photos} target="_blank" rel="noreferrer">
-                    <img 
+                    <Image 
                       src={r.photos} 
                       alt="bukti" 
                       className="w-full h-full object-cover rounded-lg border border-slate-200 group-hover:brightness-75 transition" 
