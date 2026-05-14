@@ -18,25 +18,26 @@ async function getProjectData(projectId) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      // Ambil data estimates untuk hitung RAB
       estimates: {
         where: { status: "APPROVED" },
-        take: 1 // Cukup ambil yang sudah disetujui saja
+        take: 1
       },
-      // Ambil ringkasan realisasi tanpa menarik seluruh detail user di sini
       materialRequests: {
         where: { status: "APPROVED" },
-        select: { totalPrice: true } 
+        select: { 
+          quantity: true, 
+          material: { 
+            select: { defaultPrice: true }
+          } 
+        }
       },
       operationalCosts: {
         where: { status: "APPROVED" },
         select: { amount: true }
       },
-      // Ambil data dasar untuk kartu detail
       assignments: {
         include: { user: { select: { name: true, role: { select: { name: true } } } } }
       },
-      // Ambil progress terakhir saja untuk LCP
       progressReports: {
         orderBy: { createdAt: 'desc' },
         take: 1
@@ -46,12 +47,17 @@ async function getProjectData(projectId) {
 
   if (!project) return null;
 
-  // KALKULASI DI SERVER (Cepat)
   const approvedEst = project.estimates[0] || null;
   const rabMaterial = Number(approvedEst?.materialCost || 0);
   const rabOperational = Number(approvedEst?.operationalCost || 0);
 
-  const realMaterial = project.materialRequests.reduce((sum, m) => sum + Number(m.totalPrice || 0), 0);
+  // HITUNG REALISASI MATERIAL: quantity * defaultPrice
+  const realMaterial = project.materialRequests.reduce((sum, m) => {
+    const price = Number(m.material?.defaultPrice || 0);
+    const qty = Number(m.quantity || 0);
+    return sum + (price * qty);
+  }, 0);
+
   const realOperational = project.operationalCosts.reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
   const summary = {
@@ -64,7 +70,7 @@ async function getProjectData(projectId) {
     diffTotal: (rabMaterial + rabOperational) - (realMaterial + realOperational),
   };
 
-  // Bersihkan data dari BigInt dan kirim yang diperlukan saja
+  // Konversi hasil agar aman dikirim ke Client Component
   return JSON.parse(JSON.stringify({ ...project, summary }, (key, value) =>
     typeof value === "bigint" ? value.toString() : value
   ));
