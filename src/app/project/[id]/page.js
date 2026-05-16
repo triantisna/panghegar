@@ -2,9 +2,7 @@ import { prisma } from "@/app/lib/prisma";
 import { cookies } from "next/headers";
 import DetailProjectClient from "./DetailProjectClient";
 
-// trigger rebuild v2
-
-// 1. Session check dibuat se-minimal mungkin
+// Ambil Session langsung dari database
 async function getSession() {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get("user_session");
@@ -16,30 +14,35 @@ async function getSession() {
   });
 }
 
+// Ambil Data Project dengan relasi lengkap yang dibutuhkan frontend
 async function getProjectData(projectId) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
+      // 1. Ambil semua estimates untuk daftar pending dan data berkas link
       estimates: {
-        where: { status: "APPROVED" },
-        take: 1
+        orderBy: { createdAt: 'desc' }
       },
+      // 2. Ambil dokumen berkas eksternal proyek (seperti RAB_PDF dan SURAT_KONTRAK)
+      documents: true, 
+      // 3. Ambil material requests untuk kalkulasi realisasi material ringkas
       materialRequests: {
         where: { status: "APPROVED" },
         select: { 
           quantity: true, 
-          material: { 
-            select: { defaultPrice: true }
-          } 
+          material: { select: { defaultPrice: true } } 
         }
       },
+      // 4. Ambil biaya operasional untuk kalkulasi realisasi operasional ringkas
       operationalCosts: {
         where: { status: "APPROVED" },
         select: { amount: true }
       },
+      // 5. Ambil penugasan tim proyek
       assignments: {
         include: { user: { select: { name: true, role: { select: { name: true } } } } }
       },
+      // 6. Ambil laporan progress terakhir
       progressReports: {
         orderBy: { createdAt: 'desc' },
         take: 1
@@ -49,11 +52,15 @@ async function getProjectData(projectId) {
 
   if (!project) return null;
 
-  const approvedEst = project.estimates[0] || null;
-  const rabMaterial = Number(approvedEst?.materialCost || 0);
-  const rabOperational = Number(approvedEst?.operationalCost || 0);
+  // --- LOGIKA KALKULASI RAB YANG DISETUJUI (APPROVED) ---
+  // Cari estimate dengan status APPROVED yang paling baru
+  const approvedEst = project.estimates.find(e => e.status === "APPROVED") || null;
 
-  // HITUNG REALISASI MATERIAL: quantity * defaultPrice
+  // Nilai ini yang akan dikirim ke UI dan mengisi Rp. 0 Anda tadi
+  const rabMaterial = Number(approvedEst?.estimatedMaterialCost || 0);
+  const rabOperational = Number(approvedEst?.estimatedOperationalCost || 0);
+
+  // --- LOGIKA KALKULASI REALISASI ---
   const realMaterial = project.materialRequests.reduce((sum, m) => {
     const price = Number(m.material?.defaultPrice || 0);
     const qty = Number(m.quantity || 0);
@@ -62,6 +69,7 @@ async function getProjectData(projectId) {
 
   const realOperational = project.operationalCosts.reduce((sum, c) => sum + Number(c.amount || 0), 0);
 
+  // Gabungkan hasil ke dalam objek summary baku
   const summary = {
     rabMaterial,
     rabOperational,
@@ -69,10 +77,9 @@ async function getProjectData(projectId) {
     realMaterial,
     realOperational,
     realTotal: realMaterial + realOperational,
-    diffTotal: (rabMaterial + rabOperational) - (realMaterial + realOperational),
+    diffTotal: (realMaterial + realOperational) - (rabMaterial + rabOperational),
   };
 
-  // Konversi hasil agar aman dikirim ke Client Component
   return JSON.parse(JSON.stringify({ ...project, summary }, (key, value) =>
     typeof value === "bigint" ? value.toString() : value
   ));
@@ -81,7 +88,7 @@ async function getProjectData(projectId) {
 export default async function DetailProjectPage({ params }) {
   const { id: projectId } = await params;
 
-  // Ambil data paralel
+  // Ambil data secara paralel
   const [projectData, user] = await Promise.all([
     getProjectData(projectId),
     getSession(),
