@@ -25,9 +25,8 @@ async function getProjectData(projectId) {
       },
       // 2. Ambil dokumen berkas eksternal proyek (seperti RAB_PDF dan SURAT_KONTRAK)
       documents: true, 
-      // 3. Ambil material requests untuk kalkulasi realisasi material ringkas
-      materialRequests: {
-        where: { status: "APPROVED" },
+      // 3. Ambil material usage untuk kalkulasi realisasi material ringkas
+      materialUsage: { 
         select: { 
           quantity: true, 
           material: { select: { defaultPrice: true } } 
@@ -61,13 +60,13 @@ async function getProjectData(projectId) {
   const rabOperational = Number(approvedEst?.estimatedOperationalCost || 0);
 
   // --- LOGIKA KALKULASI REALISASI ---
-  const realMaterial = project.materialRequests.reduce((sum, m) => {
-    const price = Number(m.material?.defaultPrice || 0);
-    const qty = Number(m.quantity || 0);
+  const realMaterial = project.materialUsage?.reduce((sum, u) => {
+    const price = Number(u.material?.defaultPrice || 0);
+    const qty = Number(u.quantity || 0);
     return sum + (price * qty);
-  }, 0);
+  }, 0) || 0;
 
-  const realOperational = project.operationalCosts.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const realOperational = project.operationalCosts?.reduce((sum, c) => sum + Number(c.amount || 0), 0) || 0;
 
   // Gabungkan hasil ke dalam objek summary baku
   const summary = {
