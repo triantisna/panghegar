@@ -14,13 +14,21 @@ const formatDate = (value) => {
   });
 };
 
-const ProjectDetailsCard = ({ data, projectId, role }) => {
+  const ProjectDetailsCard = ({ data, projectId, role }) => {
+  // const currentPm = data.assignments?.find((a) => a.user?.role?.name === "PM")?.user || null;
+  const currentPm = data.pm || null;
+
+  // ==== TAMBAHKAN BARIS INI UNTUK DEBUGGING ====
+  console.log("DEBUG DATA ASSIGNMENTS:", JSON.stringify(data.assignments, null, 2));
+  console.log("DEBUG PM YANG KETEMU:", currentPm);
+  // ============================================
+
   const [showEdit, setShowEdit] = useState(false);
   const [showAssignTech, setShowAssignTech] = useState(false);
 
   // ==== state edit proyek (CEO/ADMIN) ====
   const [statusEdit, setStatusEdit] = useState(data.status);
-  const [pmIdEdit, setPmIdEdit] = useState(data.pm?.id || "");
+  const [pmIdEdit, setPmIdEdit] = useState(currentPm?.id || "");
   const [descEdit, setDescEdit] = useState(data.description || "");
   const [startEdit, setStartEdit] = useState(
     data.startDate ? new Date(data.startDate).toISOString().slice(0, 10) : ""
@@ -205,7 +213,7 @@ const ProjectDetailsCard = ({ data, projectId, role }) => {
         <div className="space-y-2">
           <div>
             <span className="text-slate-500 text-sm">Project Manager</span>
-            <p className="font-medium text-slate-900">{data.pm?.name || "-"}</p>
+            <p className="font-medium text-slate-900">{currentPm?.name || "-"}</p>
           </div>
 
           <div>

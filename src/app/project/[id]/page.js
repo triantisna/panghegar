@@ -14,61 +14,89 @@ async function getSession() {
   });
 }
 
-// Ambil Data Project dengan relasi lengkap yang dibutuhkan frontend
+// Ambil Data Project Lengkap Tanpa Saringan Ketat di Level Database
 async function getProjectData(projectId) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      // 1. Ambil semua estimates untuk daftar pending dan data berkas link
       estimates: {
         orderBy: { createdAt: 'desc' }
       },
-      // 2. Ambil dokumen berkas eksternal proyek (seperti RAB_PDF dan SURAT_KONTRAK)
-      documents: true, 
-      // 3. Ambil material usage untuk kalkulasi realisasi material ringkas
+      documents: true,
+      client: true, 
+      pm: { include: { role: true } },
+      // Mengembalikan data pemakaian material beserta detail barang untuk ringkasan pemakaian
       materialUsage: { 
-        select: { 
-          quantity: true, 
-          material: { select: { defaultPrice: true } } 
+        include: {
+          material: true
         }
       },
-      // 4. Ambil biaya operasional untuk kalkulasi realisasi operasional ringkas
       operationalCosts: {
-        where: { status: "APPROVED" },
-        select: { amount: true }
+        include: { user: true }
       },
-      // 5. Ambil penugasan tim proyek
-      assignments: {
-        include: { user: { select: { name: true, role: { select: { name: true } } } } }
-      },
-      // 6. Ambil laporan progress terakhir
+      // Mengembalikan relasi progress report terlengkap (menyelesaikan bug progress 0%)
       progressReports: {
-        orderBy: { createdAt: 'desc' },
-        take: 1
+        orderBy: { createdAt: 'desc' }
+      },
+      // Mengembalikan relasi assignments secara utuh lengkap dengan detail user dan role (menyelesaikan bug PM "-")
+      assignments: {
+        include: { 
+          user: { 
+            include: { 
+              role: true 
+            } 
+          } 
+        }
       }
     },
   });
 
   if (!project) return null;
 
-  // --- LOGIKA KALKULASI RAB YANG DISETUJUI (APPROVED) ---
-  // Cari estimate dengan status APPROVED yang paling baru
-  const approvedEst = project.estimates.find(e => e.status === "APPROVED") || null;
+  // 1. Ambil Progress Terakhir untuk komponen ringkasan progress card
+  const latestProgress = project.progressReports?.[0] || null;
 
-  // Nilai ini yang akan dikirim ke UI dan mengisi Rp. 0 Anda tadi
+  // 2. Hitung Nilai Struktur RAB disetujui (APPROVED)
+  const approvedEst = project.estimates.find(e => e.status === "APPROVED") || null;
   const rabMaterial = Number(approvedEst?.estimatedMaterialCost || 0);
   const rabOperational = Number(approvedEst?.estimatedOperationalCost || 0);
 
-  // --- LOGIKA KALKULASI REALISASI ---
-  const realMaterial = project.materialUsage?.reduce((sum, u) => {
-    const price = Number(u.material?.defaultPrice || 0);
-    const qty = Number(u.quantity || 0);
-    return sum + (price * qty);
-  }, 0) || 0;
+  // 3. Ambil dan susun array summary pemakaian material untuk komponen ringkasan list material di kanan bawah
+  const usageSummaryMap = {};
+  project.materialUsage?.forEach((usage) => {
+    const matId = usage.materialId;
+    const qty = Number(usage.quantity || 0);
+    const price = Number(usage.material?.defaultPrice || 0);
+    const matName = usage.material?.name || "Unknown";
+    const matUnit = usage.material?.unit || "Unit";
 
-  const realOperational = project.operationalCosts?.reduce((sum, c) => sum + Number(c.amount || 0), 0) || 0;
+    if (!usageSummaryMap[matId]) {
+      usageSummaryMap[matId] = {
+        materialId: matId,
+        name: matName,
+        unit: matUnit,
+        totalQuantity: 0,
+        totalCost: 0,
+      };
+    }
+    usageSummaryMap[matId].totalQuantity += qty;
+    usageSummaryMap[matId].totalCost += qty * price;
+  });
+  const materialUsageSummary = Object.values(usageSummaryMap);
 
-  // Gabungkan hasil ke dalam objek summary baku
+  // 4. Hitung Realisasi Pemakaian Material berdasarkan nominal akumulasi harga (menyelesaikan bug pemakaian material 0)
+  const realMaterial = materialUsageSummary.reduce((sum, item) => sum + item.totalCost, 0);
+
+  // 5. Hitung Realisasi Biaya Operasional yang telah disetujui
+  const approvedOps = project.operationalCosts?.filter(c => c.status === "APPROVED") || [];
+  const realOperational = approvedOps.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  
+  const operationalCostSummary = {
+    totalAmount: realOperational,
+    count: approvedOps.length
+  };
+
+  // 6. Satukan data summary finansial utama proyek
   const summary = {
     rabMaterial,
     rabOperational,
@@ -79,7 +107,17 @@ async function getProjectData(projectId) {
     diffTotal: (realMaterial + realOperational) - (rabMaterial + rabOperational),
   };
 
-  return JSON.parse(JSON.stringify({ ...project, summary }, (key, value) =>
+  // Ekstrak struktur response akhir agar 100% kompatibel dengan komponen DetailProjectClient.js Anda
+  const result = {
+    ...project,
+    latestProgress,
+    materialUsageSummary,
+    operationalCostSummary,
+    summary
+  };
+
+  // Bersihkan data dari tipe BigInt agar aman dibaca oleh Client Component
+  return JSON.parse(JSON.stringify(result, (key, value) =>
     typeof value === "bigint" ? value.toString() : value
   ));
 }
@@ -87,13 +125,13 @@ async function getProjectData(projectId) {
 export default async function DetailProjectPage({ params }) {
   const { id: projectId } = await params;
 
-  // Ambil data secara paralel
+  // Mengambil data sesi pengguna dan detail data proyek secara paralel langsung dari DB
   const [projectData, user] = await Promise.all([
     getProjectData(projectId),
     getSession(),
   ]);
 
-  if (!projectData) return <div>Project not found</div>;
+  if (!projectData) return <div className="p-6">Project not found</div>;
 
   return (
     <DetailProjectClient
