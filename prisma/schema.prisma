@@ -28,12 +28,6 @@ enum ProjectStatus {
   CANCELLED
 }
 
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-}
-
 enum RequestStatus {
   PENDING
   APPROVED
